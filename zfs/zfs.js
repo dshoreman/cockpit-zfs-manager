@@ -4918,6 +4918,48 @@ function FnFileSystemsGet(pool = { name, id }) {
         });
 }
 
+function FnRunCommandAlwaysSuccess(argv) {
+    return new Promise(resolve => {
+        const proc = cockpit.spawn(argv, {
+            err: "out",
+            superuser: "require",
+        });
+
+        setTimeout(() => {
+            resolve(null);
+        }, 5000);
+
+        proc.done(data => {
+            resolve(data);
+        });
+        
+        proc.fail((_, data) => {
+            resolve(data);
+        });
+    });
+}
+
+function FnRunCommand(argv) {
+    return new Promise((resolve, reject) => {
+        const proc = cockpit.spawn(argv, {
+            err: "out",
+            superuser: "require",
+        });
+
+        setTimeout(() => {
+            resolve(null);
+        }, 5000);
+
+        proc.done(data => {
+            resolve(data);
+        });
+        
+        proc.fail((_, data) => {
+            reject(data);
+        });
+    });
+}
+
 async function FnFileSystemsGetCommand(pool = { name, id, altroot: false, boot: false, feature: { allocation_classes: true, edonr: true, encryption: true, large_blocks: true, large_dnode: true, lz4_compress: true, sha512: true, skein: true }, readonly: false, sizeraw: 0 }, process = { data, message }) {
     let filesystems = process.data.split(/\n/g).filter(v => v);
 
@@ -4960,15 +5002,25 @@ async function FnFileSystemsGetCommand(pool = { name, id, altroot: false, boot: 
         try {
             let command = ['znapzendzetup', 'list', filesystem.properties[1]];
 
-            let content = await cockpit.spawn(command, { err: "out", superuser: "require" });
+            console.log('ZnapZend Check: Starting.');
 
-            if (content.includes('cannot list backup config')) {
+            let content = await FnRunCommandAlwaysSuccess(command);
+
+            console.log('ZnapZend Check: Done.');
+
+            if (content === null) {
+                console.log('ZnapZend Check: Timed Out.');
+                existingReplicationTask = null;
+            } else if (
+                content.includes('cannot list backup config') ||
+                content.includes(`No backup set defined or enabled`)
+            ) {
                 existingReplicationTask = false;
             } else {
                 existingReplicationTask = true;
             }
         } catch (error) {
-            console.log('error', error);
+            console.log(error);
         }
 
         filesystem.properties.splice(13, 0, typeof existingReplicationTask !== 'boolean' ? 'Error' : existingReplicationTask ? 'Yes' : 'No');
@@ -21138,7 +21190,8 @@ async function FnModalReplicationTaskCreateContent(pool, filesystem, modal) {
 
             let command = ['znapzendzetup', 'list', filesystem.name];
 
-            let content = await cockpit.spawn(command, { err: "out", superuser: "require" });
+            let content = await FnRunCommand(command);
+            console.log(content);
             let lines = content.split('\n');
             let data = {};
 
@@ -21155,13 +21208,13 @@ async function FnModalReplicationTaskCreateContent(pool, filesystem, modal) {
             dstPlans = data?.dst_a_plan?.split(',').map(plan => znapzendSplitPlan(plan));
             dstScript = '';
             if (dstPlans) dstScript = dstPlans.map(plan => `AddDstPlan("#dst-storagepool-replication-task-` + filesystem.id + `", JSON.parse('${JSON.stringify(plan)}'));`).join('');
-            srcPlans = data?.src_plan.split(',').map(plan => znapzendSplitPlan(plan));
-            srcScript = srcPlans.map(plan => `AddSrcPlan("#src-storagepool-replication-task-` + filesystem.id + `", JSON.parse('${JSON.stringify(plan)}'));`).join('');
+            srcPlans = data?.src_plan?.split(',')?.map(plan => znapzendSplitPlan(plan));
+            srcScript = srcPlans?.map(plan => `AddSrcPlan("#src-storagepool-replication-task-` + filesystem.id + `", JSON.parse('${JSON.stringify(plan)}'));`)?.join('') ?? `AddSrcPlan("#src-storagepool-replication-task-` + filesystem.id + `");`;
             recursive = data?.recursive === 'on';
             mBufferSize = znapzendSplitNumberCharacter(data?.mbuffer_size);
             destination = znapzendParseDestination(data?.dst_a);
         } catch (error) {
-            FnDisplayAlert({ status: "danger", title: "Replication task could not be configured", description: '${filesystem.name}', breakword: false }, { name: "replicationtask-configure" });   
+            FnDisplayAlert({ status: "danger", title: "Replication task could not be configured", description: filesystem.name, breakword: false }, { name: "replicationtask-configure" });   
         }
     }
 

@@ -4,7 +4,7 @@
     "title": "Cockpit ZFS Manager",
     "prerelease": true,
     "version": "1.3.0",
-    "buildVersion": "1",
+    "buildVersion": "3",
     "author": "Dawson Della Valle <ddellavalle@45drives.com>",
     "url": "https://github.com/45Drives/cockpit-zfs-manager",
     "category": "utils",
@@ -35,9 +35,9 @@
     },
     "releases": [
         {
-            "image": "ubuntu-focal-builder",
-            "codeName": "focal",
-            "type": "deb"
+            "image": "centos-el7-builder",
+            "codeName": "el7",
+            "type": "el"
         }
     ],
     "changelog": {
