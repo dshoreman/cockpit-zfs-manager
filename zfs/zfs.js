@@ -4959,6 +4959,7 @@ async function FnFileSystemsGetCommand(pool = { name, id, altroot: false, boot: 
 
         try {
             let command = ['znapzendzetup', 'list', filesystem.properties[1]];
+            FnConsole.log[3](command);
 
             let content = await cockpit.spawn(command, { err: "out", superuser: "require" });
 
@@ -4968,7 +4969,7 @@ async function FnFileSystemsGetCommand(pool = { name, id, altroot: false, boot: 
                 existingReplicationTask = true;
             }
         } catch (error) {
-            console.log('error', error);
+            FnConsole.log[2](`Failed getting replication status (${error})`);
         }
 
         filesystem.properties.splice(13, 0, typeof existingReplicationTask !== 'boolean' ? 'Error' : existingReplicationTask ? 'Yes' : 'No');
