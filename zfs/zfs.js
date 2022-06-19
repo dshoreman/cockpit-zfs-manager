@@ -341,11 +341,11 @@ function FnRound(data = { decimals: 0, value }) {
 //#region Date/Time
 
 function FnDateTime() {
-    return (new Date).toLocaleString(zfsmanager.cockpit.datelocale, { day: "numeric", month: "numeric", year: "numeric", hour: "numeric", minute: "numeric", second: "numeric", hour12: true });
+    return (new Date).toLocaleString(zfsmanager.cockpit.datelocale, { day: "numeric", month: "numeric", year: "numeric", hour: "numeric", minute: "numeric", second: "numeric" });
 }
 
 function FnDateTimeEpoch(data = { date }) {
-    return (new Date(data.date * 1000)).toLocaleString(zfsmanager.cockpit.datelocale, { hour12: true });
+    return (new Date(data.date * 1000)).toLocaleString(zfsmanager.cockpit.datelocale);
 }
 
 function FnDateTimeSnapshot(data = { date }) {
@@ -550,7 +550,7 @@ function FnConsoleInitialize() {
         let time = () => { };
 
         time.toString = () => {
-            return (new Date).toLocaleString(zfsmanager.cockpit.datelocale, { hour: "numeric", minute: "numeric", second: "numeric", hour12: true }) + ":";
+            return (new Date).toLocaleString(zfsmanager.cockpit.datelocale, { hour: "numeric", minute: "numeric", second: "numeric" }) + ":";
         };
 
         return {
