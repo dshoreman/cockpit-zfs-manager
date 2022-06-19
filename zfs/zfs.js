@@ -4919,7 +4919,8 @@ function FnFileSystemsGet(pool = { name, id }) {
 }
 
 async function FnFileSystemsGetCommand(pool = { name, id, altroot: false, boot: false, feature: { allocation_classes: true, edonr: true, encryption: true, large_blocks: true, large_dnode: true, lz4_compress: true, sha512: true, skein: true }, readonly: false, sizeraw: 0 }, process = { data, message }) {
-    let filesystems = process.data.split(/\n/g).filter(v => v);
+    let filesystems = process.data.split(/\n/g).filter(v => v),
+        hasZnapzend = false;
 
     $("#tbody-storagepool-filesystems-" + pool.id).empty();
     $("#modals-storagepool-filesystems-" + pool.id).remove();
@@ -4928,6 +4929,14 @@ async function FnFileSystemsGetCommand(pool = { name, id, altroot: false, boot: 
     $("#modals").append(`<div id="modals-storagepool-filesystem-` + pool.id + `"></div>`);
     $("#modals").append(`<div id="modals-replication-tasks-` + pool.id + `"></div>`);
     $("#modals").append(`<div id="modals-permissions-edit-` + pool.id + `"></div>`);
+
+    try {
+        await cockpit.spawn('command -v znapzendzetup', { err: 'ignore' });
+
+        hasZnapzend = true;
+    } catch (error) {
+        FnConsole.log[4]('Replication unavailable, znapzendzetup could not be found.');
+    }
 
     for (let _index = 0; _index < filesystems.length; _index++) {
         let _value = filesystems[_index];
@@ -4955,24 +4964,24 @@ async function FnFileSystemsGetCommand(pool = { name, id, altroot: false, boot: 
             actionsmenu: null
         };
 
-        let existingReplicationTask = null;
+        let existingReplicationTask = null,
+            replicationStatus = 'Unavailable';
 
-        try {
-            let command = ['znapzendzetup', 'list', filesystem.properties[1]];
-            FnConsole.log[3](command);
+        if (hasZnapzend) {
+            try {
+                let command = ['znapzendzetup', 'list', filesystem.properties[1]];
+                FnConsole.log[3](command);
 
-            let content = await cockpit.spawn(command, { err: "out", superuser: "require" });
+                let content = await cockpit.spawn(command, { err: "out", superuser: "require" });
 
-            if (content.includes('cannot list backup config')) {
-                existingReplicationTask = false;
-            } else {
-                existingReplicationTask = true;
+                existingReplicationTask = !content.includes('cannot list backup config');
+                replicationStatus = existingReplicationTask ? 'Yes' : 'No';
+            } catch (error) {
+                FnConsole.log[2](`Failed getting replication status (${error})`);
+                replicationStatus = 'Error';
             }
-        } catch (error) {
-            FnConsole.log[2](`Failed getting replication status (${error})`);
         }
-
-        filesystem.properties.splice(13, 0, typeof existingReplicationTask !== 'boolean' ? 'Error' : existingReplicationTask ? 'Yes' : 'No');
+        filesystem.properties.splice(13, 0, replicationStatus);
 
         filesystem.output = `<tr>`;
 
