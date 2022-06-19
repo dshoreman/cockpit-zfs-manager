@@ -47,6 +47,7 @@ let zfsmanager = {
                 quotarestrict: true, //Restrict quota maximum to size of storage pool
                 readonlylockdown: false, //Prevent changes to read only file systems and clone file systems
                 snapshotactions: true, //Display snapshot actions in file system actions menu
+                replication: true, //Enable replication and backup features powered by ZnapZend
             },
             snapshot: {
                 filesystemlist: true //Display snapshots in lists by file system
@@ -614,6 +615,7 @@ function FnConfigurationGet() {
                 user.zfs.filesystem.cloneorigin = (user.zfs.filesystem.cloneorigin === undefined ? zfsmanager.configuration.zfs.filesystem.cloneorigin : user.zfs.filesystem.cloneorigin);
                 user.zfs.filesystem.quotarestrict = (user.zfs.filesystem.quotarestrict === undefined ? zfsmanager.configuration.zfs.filesystem.quotarestrict : user.zfs.filesystem.quotarestrict);
                 user.zfs.filesystem.readonlylockdown = (user.zfs.filesystem.readonlylockdown === undefined ? zfsmanager.configuration.zfs.filesystem.readonlylockdown : user.zfs.filesystem.readonlylockdown);
+                user.zfs.filesystem.replication = (user.zfs.filesystem.replication === undefined ? zfsmanager.configuration.zfs.filesystem.replication : user.zfs.filesystem.replication);
                 user.zfs.snapshot = (user.zfs.snapshot === undefined ? zfsmanager.configuration.zfs.snapshot : user.zfs.snapshot);
                 user.zfs.snapshot.filesystemlist = (user.zfs.snapshot.filesystemlist === undefined ? zfsmanager.configuration.zfs.snapshot.filesystemlist : user.zfs.snapshot.filesystemlist);
                 user.zfs.status = (user.zfs.status === undefined ? zfsmanager.configuration.zfs.status : user.zfs.status);
@@ -643,7 +645,7 @@ function FnConfigurationGet() {
         });
 };
 
-function FnConfigure(user = { cockpit: { manage: true }, disks: { base2: false }, loglevel: 1, samba: { manage: true, windowscompatibility: true }, updates: { check: true }, zfs: { filesystem: { cloneorigin: false, quotarestrict: true, readonlylockdown: true, snapshotactions: true }, snapshot: { filesystemlist: true }, status: { errorcolors: true, trimunsupported: false }, storagepool: { activetab: 1, boot: true, bootlockdown: true, count: true, refreshall: false, root: true } } }, modal = { name, welcome: false }) {    let process = {
+function FnConfigure(user = { cockpit: { manage: true }, disks: { base2: false }, loglevel: 1, samba: { manage: true, windowscompatibility: true }, updates: { check: true }, zfs: { filesystem: { cloneorigin: false, quotarestrict: true, readonlylockdown: true, replication: true, snapshotactions: true }, snapshot: { filesystemlist: true }, status: { errorcolors: true, trimunsupported: false }, storagepool: { activetab: 1, boot: true, bootlockdown: true, count: true, refreshall: false, root: true } } }, modal = { name, welcome: false }) {    let process = {
         command: ["/bin/sh", "-c", "echo '" + JSON.stringify(user, null, "  ").replace(/^\{\n/, `{\n  "#1": "COCKPIT ZFS MANAGER",\n  "#2": "WARNING: DO NOT EDIT, AUTO-GENERATED CONFIGURATION",\n`) + "' > /etc/cockpit/zfs/config.json"]
     };
 
@@ -1347,7 +1349,7 @@ function FnStoragePoolsGetCommand(process = { data, message }) {
 											        <th>Deduplication</th>
 											        <th>Share</th>
 											        <th>Mounted</th>
-                                                    <th>Replication</th>
+                                                    ` + (zfsmanager.configuration.zfs.filesystem.replication ? `<th>Replication</th>` : ``) + `
 											        <th class="listing-ct-icon"></th>
 											        <th class="listing-ct-icon"></th>
 											        <th class="listing-ct-actionsmenu"></th>
@@ -5114,7 +5116,9 @@ async function FnFileSystemsGetCommand(pool = { name, id, altroot: false, boot: 
 
                     break;
                 case 13: //13=replication task
-                    if (__value.toLowerCase() == "yes") {
+                    if (!zfsmanager.configuration.zfs.filesystem.replication) {
+                        break;
+                    } else if (__value.toLowerCase() == "yes") {
                         filesystem.replicationtask = true;
                     } else {
                         filesystem.replicationtask = false;
@@ -5260,7 +5264,7 @@ async function FnFileSystemsGetCommand(pool = { name, id, altroot: false, boot: 
                 }
 
                 //Configure Replication Task
-                if (!pool.readonly && (!filesystem.readonly || filesystem.readonly && !zfsmanager.configuration.zfs.filesystem.readonlylockdown) && filesystem.name != pool.name) {
+                if (zfsmanager.configuration.zfs.filesystem.replication && !pool.readonly && (!filesystem.readonly || filesystem.readonly && !zfsmanager.configuration.zfs.filesystem.readonlylockdown) && filesystem.name != pool.name) {
                     if (!filesystem.clone || filesystem.clone && new RegExp("^" + filesystem.name + "/").test(filesystem.origin.replace(/^(.*)\@.*$/, "$1")) == false) { //Do not display if clone origin is a child file system - will generate recursive dependency error
                         filesystem.actionsmenu.addAction('replication', `<li><a id="btn-storagepool-replication-task-configure-` + filesystem.id + `" data-toggle="modal" href="#modal-storagepool-replication-task-configure-` + filesystem.id + `" tabIndex="-1">Configure Replication Task</a></li>`);
 
@@ -13360,6 +13364,9 @@ function FnModalConfigureContent(modal = { id }) {
                             <label id="switch-configure-zfs-filesystem-readonlylockdown" class="onoff-ct privileged-modal"><input ` + (zfsmanager.configuration.zfs.filesystem.readonlylockdown ? `checked="checked"` : ``) + ` tabIndex="7" type="checkbox"><span class="switch-toggle"></span></label><span>Prevent changes to read only file systems and clone file systems</span>
                         </div>
                         <div role="group">
+                            <label id="switch-configure-zfs-filesystem-replication" class="onoff-ct privileged-modal"><input ` + (zfsmanager.configuration.zfs.filesystem.replication ? `checked="checked"` : ``) + ` tabIndex="8" type="checkbox"><span class="switch-toggle"></span></label><span>Enable backup/replication features (requires ZnapZend)</span>
+                        </div>
+                        <div role="group">
                             <label id="switch-configure-zfs-filesystem-snapshotactions" class="onoff-ct privileged-modal"><input ` + (zfsmanager.configuration.zfs.filesystem.snapshotactions ? `checked="checked"` : ``) + ` tabIndex="8" type="checkbox"><span class="switch-toggle"></span></label><span>Display snapshot actions in file system actions menu</span>
                         </div>
                         <div role="group">
@@ -13459,6 +13466,7 @@ function FnModalConfigureContent(modal = { id }) {
                             cloneorigin: $("#switch-configure-zfs-filesystem-cloneorigin input").prop("checked"),
                             quotarestrict: $("#switch-configure-zfs-filesystem-quotarestrict input").prop("checked"),
                             readonlylockdown: $("#switch-configure-zfs-filesystem-readonlylockdown input").prop("checked"),
+                            replication: $("#switch-configure-zfs-filesystem-replication input").prop("checked"),
                             snapshotactions: $("#switch-configure-zfs-filesystem-snapshotactions input").prop("checked")
                         },
                         snapshot: {
@@ -13479,7 +13487,7 @@ function FnModalConfigureContent(modal = { id }) {
                     }
                 };
 
-                FnConfigure({ cockpit: { manage: user.cockpit.manage }, disks: { base2: user.disks.base2 }, loglevel: user.loglevel, samba: { manage: user.samba.manage, windowscompatibility: user.samba.windowscompatibility }, updates: { check: user.updates.check }, zfs: { filesystem: { cloneorigin: user.zfs.filesystem.cloneorigin, quotarestrict: user.zfs.filesystem.quotarestrict, readonlylockdown: user.zfs.filesystem.readonlylockdown, snapshotactions: user.zfs.filesystem.snapshotactions }, snapshot: { filesystemlist: user.zfs.snapshot.filesystemlist }, status: { errorcolors: user.zfs.status.errorcolors, trimunsupported: user.zfs.status.trimunsupported }, storagepool: { activetab: user.zfs.storagepool.activetab, boot: user.zfs.storagepool.boot, bootlockdown: user.zfs.storagepool.bootlockdown, count: user.zfs.storagepool.count, refreshall: user.zfs.storagepool.refreshall, root: user.zfs.storagepool.root } } }, { name: "configure", welcome: false })
+                FnConfigure({ cockpit: { manage: user.cockpit.manage }, disks: { base2: user.disks.base2 }, loglevel: user.loglevel, samba: { manage: user.samba.manage, windowscompatibility: user.samba.windowscompatibility }, updates: { check: user.updates.check }, zfs: { filesystem: { cloneorigin: user.zfs.filesystem.cloneorigin, quotarestrict: user.zfs.filesystem.quotarestrict, readonlylockdown: user.zfs.filesystem.readonlylockdown, replication: user.zfs.filesystem.replication, snapshotactions: user.zfs.filesystem.snapshotactions }, snapshot: { filesystemlist: user.zfs.snapshot.filesystemlist }, status: { errorcolors: user.zfs.status.errorcolors, trimunsupported: user.zfs.status.trimunsupported }, storagepool: { activetab: user.zfs.storagepool.activetab, boot: user.zfs.storagepool.boot, bootlockdown: user.zfs.storagepool.bootlockdown, count: user.zfs.storagepool.count, refreshall: user.zfs.storagepool.refreshall, root: user.zfs.storagepool.root } } }, { name: "configure", welcome: false })
             });
 
             $("#dropdown-configure-zfs-storagepool-activetab").on("click", "li a", function () {
